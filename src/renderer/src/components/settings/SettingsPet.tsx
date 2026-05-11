@@ -1,9 +1,11 @@
+import { useEffect } from 'react'
 import { Bug, Check } from 'lucide-react'
 import type { PetSettings, PetSize } from '@shared/types/pet'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { listPets } from '@/pet/registry'
+import { listPets, loadCustomPets } from '@/pet/registry'
 import { useSettingsStore } from '@/stores/useSettingsStore'
+import { CustomPetForm } from './CustomPetForm'
 
 const SIZE_OPTIONS: Array<{ id: PetSize; label: string; description: string }> = [
   { id: 'S', label: 'S', description: '64 px' },
@@ -17,6 +19,16 @@ export function SettingsPet(): React.JSX.Element {
 
   const updatePet = (partial: Partial<PetSettings>): void => {
     updateSetting('pet', { ...pet, ...partial })
+  }
+
+  // Load custom pets on mount
+  useEffect(() => {
+    loadCustomPets()
+  }, [])
+
+  const handleCustomPetCreated = (petId: string) => {
+    // Auto-select the newly created pet
+    updatePet({ petId })
   }
 
   return (
@@ -127,6 +139,9 @@ export function SettingsPet(): React.JSX.Element {
           Show pet
         </Button>
       )}
+
+      {/* Custom Pet Form */}
+      <CustomPetForm onSuccess={handleCustomPetCreated} />
     </div>
   )
 }

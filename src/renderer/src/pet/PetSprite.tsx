@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { motion } from 'motion/react'
 import type * as React from 'react'
 import type { LoadedPet, PetSettings, PetState } from '@shared/types/pet'
 import { DotLottieSprite } from './DotLottieSprite'
+import { getBee } from './registry'
 
 const SIZE_PX: Record<PetSettings['size'], number> = {
   S: 64,
@@ -63,11 +65,31 @@ export function PetSprite({
   onClick: (event: React.MouseEvent<HTMLElement>) => void
   onContextMenu: (event: React.MouseEvent<HTMLElement>) => void
 }): React.JSX.Element {
+  const [imageError, setImageError] = useState(false)
+  const [lottieError, setLottieError] = useState(false)
+
   const size = SIZE_PX[settings.size]
   const overlay = overlayForState(state)
   const lottieSrc = state === 'working' ? pet.resolvedLottieAssets?.working : undefined
   const lottieScale = state === 'working' ? (pet.lottieScale?.working ?? 1) : 1
-  const activeAnimation = lottieSrc ? {} : animationForState(state)
+  const activeAnimation = lottieSrc && !lottieError ? {} : animationForState(state)
+
+  // Fallback to bee if image fails to load
+  const beePet = getBee()
+  const fallbackAsset = beePet?.resolvedAssets[state]
+
+  const handleImageError = () => {
+    console.warn(`Failed to load pet image: ${pet.id} state: ${state}`)
+    setImageError(true)
+  }
+
+  const handleLottieError = () => {
+    console.warn(`Failed to load Lottie animation: ${pet.id}`)
+    setLottieError(true)
+  }
+
+  // Determine which image to show
+  const imageSrc = imageError && fallbackAsset ? fallbackAsset : pet.resolvedAssets[state]
 
   return (
     <button
@@ -87,16 +109,17 @@ export function PetSprite({
         {...activeAnimation}
       >
         {state === 'plan_ready' && <span className="pet-glow" />}
-        {lottieSrc ? (
+        {lottieSrc && !lottieError ? (
           <DotLottieSprite
             src={lottieSrc}
-            fallbackSrc={pet.resolvedAssets[state]}
+            fallbackSrc={imageSrc}
             scale={lottieScale}
             size={size}
             state={state}
+            onError={handleLottieError}
           />
         ) : (
-          <img src={pet.resolvedAssets[state]} alt="" draggable={false} />
+          <img src={imageSrc} alt="" draggable={false} onError={handleImageError} />
         )}
         {overlay && <span className={overlay.className}>{overlay.symbol}</span>}
       </motion.span>

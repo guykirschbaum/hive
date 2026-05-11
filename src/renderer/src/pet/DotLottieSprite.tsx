@@ -31,13 +31,15 @@ export function DotLottieSprite({
   fallbackSrc,
   scale,
   size,
-  state
+  state,
+  onError
 }: {
   src: string
   fallbackSrc: string
   scale: number
   size: number
   state: string
+  onError?: () => void
 }): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [hasRendered, setHasRendered] = useState(false)
@@ -79,6 +81,7 @@ export function DotLottieSprite({
       })
       .catch((error: unknown) => {
         console.error('Failed to render pet Lottie animation', error)
+        onError?.()
       })
 
     return () => {
