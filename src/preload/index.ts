@@ -664,7 +664,34 @@ const petOps = {
     return () => {
       ipcRenderer.removeListener('pet:jump-to-worktree', handler)
     }
-  }
+  },
+  // Custom pet operations
+  createCustomPet: (params: {
+    name: string
+    mainImageBuffer: Uint8Array
+    mainImageExt: string
+    lottieBuffer?: Uint8Array
+    transform: 'spin' | 'bounce' | 'pulse' | 'none'
+    questionColor: string
+    permissionColor: string
+    planReadyColor: string
+    defaultSize: 'S' | 'M' | 'L'
+  }): Promise<{ success: boolean; data?: PetManifest; error?: string }> =>
+    ipcRenderer.invoke('pet:create-custom', params),
+  listCustomPets: (): Promise<{ success: boolean; data?: LoadedPet[]; error?: string }> =>
+    ipcRenderer.invoke('pet:list-custom'),
+  deleteCustomPet: (petId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('pet:delete-custom', petId),
+  updateCustomPet: (
+    petId: string,
+    updates: Partial<PetManifest>
+  ): Promise<{ success: boolean; data?: PetManifest; error?: string }> =>
+    ipcRenderer.invoke('pet:update-custom', petId, updates),
+  loadAsset: (
+    petId: string,
+    relativePath: string
+  ): Promise<{ success: boolean; data?: string; error?: string }> =>
+    ipcRenderer.invoke('pet:load-asset', petId, relativePath)
 }
 
 // Response logging operations API (only functional when --log is active)

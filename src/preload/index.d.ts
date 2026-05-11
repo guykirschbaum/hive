@@ -677,6 +677,28 @@ declare global {
       onStatus: (callback: (payload: PetStatusPayload) => void) => () => void
       onSettingsUpdated: (callback: (settings: PetSettings) => void) => () => void
       onJumpToWorktree: (callback: (payload: { worktreeId: string }) => void) => () => void
+      // Custom pet operations
+      createCustomPet: (params: {
+        name: string
+        mainImageBuffer: Uint8Array
+        mainImageExt: string
+        lottieBuffer?: Uint8Array
+        transform: 'spin' | 'bounce' | 'pulse' | 'none'
+        questionColor: string
+        permissionColor: string
+        planReadyColor: string
+        defaultSize: 'S' | 'M' | 'L'
+      }) => Promise<{ success: boolean; data?: PetManifest; error?: string }>
+      listCustomPets: () => Promise<{ success: boolean; data?: LoadedPet[]; error?: string }>
+      deleteCustomPet: (petId: string) => Promise<{ success: boolean; error?: string }>
+      updateCustomPet: (
+        petId: string,
+        updates: Partial<PetManifest>
+      ) => Promise<{ success: boolean; data?: PetManifest; error?: string }>
+      loadAsset: (
+        petId: string,
+        relativePath: string
+      ) => Promise<{ success: boolean; data?: string; error?: string }>
     }
     loggingOps: {
       createResponseLog: (sessionId: string) => Promise<string>
