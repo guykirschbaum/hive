@@ -16,7 +16,7 @@ const CODEX_EFFORT_VARIANTS: Record<string, Record<string, never>> = {
   low: {}
 }
 
-// gpt-5.6 efforts (wire values from codex models.json): luna stops at max, sol/terra add ultra.
+// gpt-5.6/gpt-6 efforts (wire values from codex models.json): luna stops at max, sol/terra/astra add ultra.
 const CODEX_EFFORT_VARIANTS_MAX: Record<string, Record<string, never>> = {
   max: {},
   ...CODEX_EFFORT_VARIANTS
@@ -28,6 +28,13 @@ const CODEX_EFFORT_VARIANTS_ULTRA: Record<string, Record<string, never>> = {
 }
 
 export const CODEX_MODELS: CodexModelInfo[] = [
+  {
+    id: 'gpt-6-astra',
+    name: 'GPT-6 Astra',
+    limit: { context: 372000, output: 32000 },
+    variants: CODEX_EFFORT_VARIANTS_ULTRA,
+    defaultVariant: 'high'
+  },
   {
     id: 'gpt-5.6-sol',
     name: 'GPT-5.6 Sol',
@@ -135,6 +142,8 @@ export function getCodexModelInfo(
 // ── Model slug normalization ──────────────────────────────────────
 
 export const CODEX_MODEL_ALIASES: Record<string, string> = {
+  '6-astra': 'gpt-6-astra',
+  'gpt-6': 'gpt-6-astra',
   '5.6-sol': 'gpt-5.6-sol',
   '5.6-terra': 'gpt-5.6-terra',
   '5.6-luna': 'gpt-5.6-luna',
