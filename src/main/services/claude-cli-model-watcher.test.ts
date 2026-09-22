@@ -171,7 +171,7 @@ describe('handleClaudeCliModelChangeHook', () => {
 
     appendFileSync(transcriptPath, assistantLine('claude-opus-4-8'))
     handleClaudeCliModelChangeHook(SESSION_ID, stopHook(), { db })
-    // Stored as the distinct fallback id, not the selectable `opus` (Opus 5).
+    // Stored as the distinct fallback id, not the selectable `opus` (Opus 5.5).
     expect(db.updateSession).toHaveBeenCalledWith(SESSION_ID, { model_id: 'opus-4-8' })
     expect(publishDesktopBackendEvent).toHaveBeenCalledWith(
       'opencode:stream',
@@ -196,14 +196,14 @@ describe('handleClaudeCliModelChangeHook', () => {
     expect(db.updateSession).toHaveBeenCalledWith(SESSION_ID, { model_id: 'opus-4-8' })
   })
 
-  it('keeps a safety fallback distinct from a selectable Opus 5 line', () => {
-    // A real Opus 5 snapshot collapses to the selectable `opus`; only the
+  it('keeps a safety fallback distinct from a selectable Opus 5.5 line', () => {
+    // A real Opus 5.5 snapshot collapses to the selectable `opus`; only the
     // Opus 4.x fallback keeps its own non-selectable id.
     const db = makeDb(makeSession())
     writeFileSync(transcriptPath, assistantLine('claude-fable-5'))
     handleClaudeCliModelChangeHook(SESSION_ID, stopHook(), { db })
 
-    appendFileSync(transcriptPath, assistantLine('claude-opus-5-20260101'))
+    appendFileSync(transcriptPath, assistantLine('claude-opus-5-5-20260101'))
     handleClaudeCliModelChangeHook(SESSION_ID, stopHook(), { db })
     expect(db.updateSession).toHaveBeenCalledWith(SESSION_ID, { model_id: 'opus' })
   })
@@ -270,7 +270,7 @@ describe('handleClaudeCliModelChangeHook', () => {
 
     // The respawned CLI answers on opus: a live sonnet→opus transition whose
     // alias equals the row — still nothing to write.
-    appendFileSync(transcriptPath, assistantLine('claude-opus-5-20260101'))
+    appendFileSync(transcriptPath, assistantLine('claude-opus-5-5-20260101'))
     handleClaudeCliModelChangeHook(SESSION_ID, stopHook(), { db })
     expect(db.updateSession).not.toHaveBeenCalled()
   })
@@ -402,7 +402,7 @@ describe('handleClaudeCliModelChangeHook', () => {
       { hook_event_name: 'UserPromptSubmit', transcript_path: transcriptPath },
       { db }
     )
-    appendFileSync(transcriptPath, assistantLine('claude-opus-5-20260101'))
+    appendFileSync(transcriptPath, assistantLine('claude-opus-5-5-20260101'))
     handleClaudeCliModelChangeHook(
       SESSION_ID,
       { hook_event_name: 'UserPromptSubmit', transcript_path: transcriptPath },
@@ -456,7 +456,7 @@ describe('handleClaudeCliModelChangeHook', () => {
     handleClaudeCliModelChangeHook(SESSION_ID, stopHook(), { db })
     expect(db.updateSession).not.toHaveBeenCalled()
 
-    appendFileSync(transcriptPath, assistantLine('claude-opus-5-20260101'))
+    appendFileSync(transcriptPath, assistantLine('claude-opus-5-5-20260101'))
     handleClaudeCliModelChangeHook(SESSION_ID, stopHook(), { db })
     expect(db.updateSession).toHaveBeenCalledWith(SESSION_ID, { model_id: 'opus' })
   })
@@ -490,7 +490,7 @@ describe('handleClaudeCliModelChangeHook', () => {
 
     // The tail-read baseline must have seeded sonnet: a live opus line is a
     // sonnet→opus transition, and opus ≠ the row's fable.
-    appendFileSync(transcriptPath, assistantLine('claude-opus-5-20260101'))
+    appendFileSync(transcriptPath, assistantLine('claude-opus-5-5-20260101'))
     handleClaudeCliModelChangeHook(SESSION_ID, stopHook(), { db })
     expect(db.updateSession).toHaveBeenCalledWith(SESSION_ID, { model_id: 'opus' })
   })

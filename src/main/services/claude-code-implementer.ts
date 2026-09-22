@@ -88,7 +88,7 @@ const CLAUDE_MODELS = [
   },
   {
     id: 'opus',
-    name: 'Opus 5',
+    name: 'Opus 5.5',
     limit: { context: 1000000, output: 32000 },
     variants: CLAUDE_OPUS_EFFORT_VARIANTS,
     defaultVariant: 'high'

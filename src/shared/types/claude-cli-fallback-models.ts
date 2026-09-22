@@ -2,9 +2,9 @@
  * Claude CLI safety / usage fallbacks land a session on an Opus 4.x snapshot
  * (e.g. Fable 5.1's dual-use guard degrades to Opus 4.8). These are real models
  * the CLI answers on, but they are NOT selectable picker options — the picker
- * only offers the current top-tier line (Opus 5, Fable 5.1, …). Collapsing them
+ * only offers the current top-tier line (Opus 5.5, Fable 5.1, …). Collapsing them
  * to the plain `opus` alias made a degraded session read as the selectable
- * "Opus 5" on its ticket badge, so they get their own id + display name here.
+ * "Opus 5.5" on its ticket badge, so they get their own id + display name here.
  *
  * This module is the single source of truth shared by the main-process detector
  * (which stores the id on the session) and the renderer (which resolves the

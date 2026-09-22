@@ -284,7 +284,7 @@ function clampEffortVariant(alias: string, variant: string | null | undefined): 
  * The model id Hive stores for a raw transcript model (or an already-stored
  * id). Selectable models collapse to their alias (fable/opus/sonnet/haiku); a
  * safety/usage fallback keeps a distinct id (e.g. `opus-4-8`) so the ticket
- * badge shows "Opus 4.8" instead of the selectable "Opus 5". Comparing both
+ * badge shows "Opus 4.8" instead of the selectable "Opus 5.5". Comparing both
  * sides through this resolver keeps the no-op guard honest — a stored
  * `opus-4-8` and a fresh `claude-opus-4-8` line canonicalize to the same id.
  */
