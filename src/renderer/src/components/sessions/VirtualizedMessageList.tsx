@@ -1,4 +1,4 @@
-import { useMemo, memo, forwardRef, useImperativeHandle } from 'react'
+import { useMemo, memo, forwardRef, useImperativeHandle, useEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { AlertCircle, RefreshCw, Minimize2 } from 'lucide-react'
 import { MessageRenderer } from './MessageRenderer'
@@ -6,6 +6,7 @@ import { QueuedMessageBubble } from './QueuedMessageBubble'
 import type { OpenCodeMessage } from './SessionView'
 import { formatCompletionDuration } from '@/lib/format-utils'
 import beeIcon from '@/assets/bee.png'
+import { stabilizeAnchor, computeAnchorFraction } from './scroll-tag-anchors'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,12 +47,22 @@ export interface VirtualizedMessageListProps {
   completionEntry: { word?: string; durationMs?: number } | null
   scrollElement: HTMLDivElement | null
   lockViewport: boolean
+  /** Fires when the virtualizer's total content size changes (rerender signal for scroll-tag markers). */
+  onTotalSizeChange?: (size: number) => void
 }
 
 export interface VirtualizedMessageListHandle {
   scrollToEnd: (behavior?: ScrollBehavior) => void
   captureViewportAnchor: () => VirtualizedMessageListViewportAnchor | null
+  /**
+   * Like captureViewportAnchor, but never anchors to ephemeral items
+   * (optimistic local messages, streaming/queued items, banners) — walks back
+   * to the nearest stable item instead. Used by scroll tags.
+   */
+  captureStableViewportAnchor: () => VirtualizedMessageListViewportAnchor | null
   restoreViewportAnchor: (anchor: VirtualizedMessageListViewportAnchor) => boolean
+  /** 0..1 fraction of the anchor within the full content, or null if unresolvable. */
+  getAnchorFraction: (anchor: VirtualizedMessageListViewportAnchor) => number | null
 }
 
 export interface VirtualizedMessageListViewportAnchor {
@@ -96,7 +107,8 @@ export const VirtualizedMessageList = memo(
         steeringMessageId,
         completionEntry,
         scrollElement,
-        lockViewport
+        lockViewport,
+        onTotalSizeChange
       }: VirtualizedMessageListProps,
       ref
     ): React.JSX.Element {
@@ -173,18 +185,15 @@ export const VirtualizedMessageList = memo(
         ? () => false
         : undefined
 
+      const totalSize = virtualizer.getTotalSize()
+      useEffect(() => {
+        onTotalSizeChange?.(totalSize)
+      }, [totalSize, onTotalSizeChange])
+
       useImperativeHandle(
         ref,
-        () => ({
-          scrollToEnd: (behavior?: ScrollBehavior) => {
-            if (items.length > 0) {
-              virtualizer.scrollToIndex(items.length - 1, {
-                align: 'end',
-                behavior: behavior ?? 'instant'
-              })
-            }
-          },
-          captureViewportAnchor: () => {
+        () => {
+          const captureAnchor = (): VirtualizedMessageListViewportAnchor | null => {
             if (!scrollElement || items.length === 0) return null
 
             const scrollTop = scrollElement.scrollTop
@@ -199,32 +208,55 @@ export const VirtualizedMessageList = memo(
               fallbackScrollTop: scrollTop,
               fallbackScrollHeight: scrollElement.scrollHeight
             }
-          },
-          restoreViewportAnchor: (anchor: VirtualizedMessageListViewportAnchor) => {
-            if (!scrollElement) return false
+          }
 
-            const anchorItem = virtualizer.measurementsCache.find(
-              (measurement) => String(measurement.key) === anchor.itemKey
-            )
-            const fallbackScrollTop =
-              anchor.fallbackScrollTop + (scrollElement.scrollHeight - anchor.fallbackScrollHeight)
-            const nextScrollTop = anchorItem
-              ? anchorItem.start + anchor.offsetWithinItem
-              : fallbackScrollTop
-            const maxScrollTop = Math.max(
-              0,
-              scrollElement.scrollHeight - scrollElement.clientHeight
-            )
-            const clampedScrollTop = Math.max(0, Math.min(nextScrollTop, maxScrollTop))
+          const getMeasurements = () =>
+            virtualizer.measurementsCache.map((m) => ({ key: String(m.key), start: m.start }))
 
-            if (Math.abs(scrollElement.scrollTop - clampedScrollTop) < 1) {
+          return {
+            scrollToEnd: (behavior?: ScrollBehavior) => {
+              if (items.length > 0) {
+                virtualizer.scrollToIndex(items.length - 1, {
+                  align: 'end',
+                  behavior: behavior ?? 'instant'
+                })
+              }
+            },
+            captureViewportAnchor: captureAnchor,
+            captureStableViewportAnchor: () => {
+              const base = captureAnchor()
+              if (!base) return null
+              return stabilizeAnchor(base, getMeasurements())
+            },
+            getAnchorFraction: (anchor: VirtualizedMessageListViewportAnchor) =>
+              computeAnchorFraction(anchor, getMeasurements(), virtualizer.getTotalSize()),
+            restoreViewportAnchor: (anchor: VirtualizedMessageListViewportAnchor) => {
+              if (!scrollElement) return false
+
+              const anchorItem = virtualizer.measurementsCache.find(
+                (measurement) => String(measurement.key) === anchor.itemKey
+              )
+              const fallbackScrollTop =
+                anchor.fallbackScrollTop +
+                (scrollElement.scrollHeight - anchor.fallbackScrollHeight)
+              const nextScrollTop = anchorItem
+                ? anchorItem.start + anchor.offsetWithinItem
+                : fallbackScrollTop
+              const maxScrollTop = Math.max(
+                0,
+                scrollElement.scrollHeight - scrollElement.clientHeight
+              )
+              const clampedScrollTop = Math.max(0, Math.min(nextScrollTop, maxScrollTop))
+
+              if (Math.abs(scrollElement.scrollTop - clampedScrollTop) < 1) {
+                return true
+              }
+
+              scrollElement.scrollTop = clampedScrollTop
               return true
             }
-
-            scrollElement.scrollTop = clampedScrollTop
-            return true
           }
-        }),
+        },
         [items, scrollElement, virtualizer]
       )
 
