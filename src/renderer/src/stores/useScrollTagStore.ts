@@ -1,17 +1,13 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+import type { ScrollAnchor } from '@/lib/scroll-tag-anchors'
 
 /**
- * Anchor for a scroll tag — structurally identical to
- * VirtualizedMessageListViewportAnchor so tags can be passed straight to
- * restoreViewportAnchor().
+ * Anchor for a scroll tag — the shared ScrollAnchor shape, structurally
+ * identical to VirtualizedMessageListViewportAnchor so tags can be passed
+ * straight to restoreViewportAnchor().
  */
-export interface ScrollTagAnchor {
-  itemKey: string
-  offsetWithinItem: number
-  fallbackScrollTop: number
-  fallbackScrollHeight: number
-}
+export type ScrollTagAnchor = ScrollAnchor
 
 export interface ScrollTag {
   id: string
@@ -24,6 +20,8 @@ export interface ScrollTag {
 }
 
 export const MAX_TAGS_PER_SESSION = 50
+/** LRU cap on how many sessions keep tags in localStorage. */
+export const MAX_SESSIONS = 50
 
 interface ScrollTagState {
   tagsBySession: Record<string, ScrollTag[]>
@@ -42,7 +40,18 @@ export const useScrollTagStore = create<ScrollTagState>()(
           const next = [...existing, tag]
           // Cap per session: drop oldest first.
           while (next.length > MAX_TAGS_PER_SESSION) next.shift()
-          return { tagsBySession: { ...state.tagsBySession, [sessionId]: next } }
+
+          // Re-insert the session key so insertion order tracks recency (LRU).
+          const tagsBySession = { ...state.tagsBySession }
+          delete tagsBySession[sessionId]
+          tagsBySession[sessionId] = next
+
+          // Cap total sessions: drop least-recently-touched first.
+          const keys = Object.keys(tagsBySession)
+          for (let i = 0; keys.length - i > MAX_SESSIONS; i++) {
+            delete tagsBySession[keys[i]]
+          }
+          return { tagsBySession }
         }),
 
       removeTag: (sessionId, tagId) =>

@@ -1,5 +1,6 @@
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import { BookmarkPlus, Bookmark, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
   ContextMenu,
@@ -16,35 +17,61 @@ const EMPTY_TAGS: ScrollTag[] = []
 interface ScrollTagGutterProps {
   sessionId: string
   listRef: React.RefObject<VirtualizedMessageListHandle | null>
+  /** The message scroller; wheel events over the gutter are forwarded to it. */
+  scrollElement: HTMLDivElement | null
   /** Rerender signal: markers reposition when the virtualized content size changes. */
   totalSize: number
 }
 
 /**
- * Thin interactive strip along the right edge of the message list.
- * Right-click empty strip → tag the current scroll position (randomly
- * colored). Markers render proportionally to their location; click jumps
- * back; right-click a marker → go to / delete.
+ * Thin interactive strip along the right edge of the message list (a minimap
+ * of the conversation). Right-click a spot on the strip → tag that point in
+ * the conversation (randomly colored). Markers render proportionally to
+ * their location; click jumps back; right-click a marker → go to / delete.
+ *
+ * Sits at right-[12px] to stay clear of the 12px scrollbar hit area
+ * (globals.css), and forwards wheel events to the scroller since it overlays
+ * it as a sibling.
  */
 export function ScrollTagGutter({
   sessionId,
   listRef,
+  scrollElement,
   totalSize: _totalSize
 }: ScrollTagGutterProps): React.JSX.Element {
   const tags = useScrollTagStore((s) => s.tagsBySession[sessionId]) ?? EMPTY_TAGS
   const addTag = useScrollTagStore((s) => s.addTag)
   const removeTag = useScrollTagStore((s) => s.removeTag)
 
+  const containerRef = useRef<HTMLDivElement>(null)
+  // Fraction of the gutter height where the user right-clicked, captured
+  // before Radix opens the context menu.
+  const pendingFractionRef = useRef(0)
+
+  const handleStripContextMenu = useCallback((e: React.MouseEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect || rect.height <= 0) return
+    pendingFractionRef.current = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height))
+  }, [])
+
+  const handleWheel = useCallback(
+    (e: React.WheelEvent) => {
+      scrollElement?.scrollBy({ top: e.deltaY, left: e.deltaX })
+    },
+    [scrollElement]
+  )
+
   const handleAddTag = useCallback(() => {
-    const list = listRef.current
-    if (!list) return
-    const anchor = list.captureStableViewportAnchor()
-    if (!anchor) return
+    const anchor = listRef.current?.captureAnchorAtFraction(pendingFractionRef.current)
+    if (!anchor) {
+      toast.error('Could not tag this spot')
+      return
+    }
     addTag(sessionId, {
       id: crypto.randomUUID(),
       color: generateScrollTagColor(new Set(tags.map((t) => t.color))),
       anchor,
-      fractionHint: list.getAnchorFraction(anchor) ?? 0,
+      fractionHint: listRef.current?.getAnchorFraction(anchor) ?? pendingFractionRef.current,
       createdAt: Date.now()
     })
   }, [listRef, sessionId, tags, addTag])
@@ -58,13 +85,15 @@ export function ScrollTagGutter({
 
   return (
     <div
-      className="absolute top-0 bottom-0 right-[6px] w-2.5 z-10"
+      ref={containerRef}
+      className="absolute top-0 bottom-0 right-[12px] w-2.5 z-10"
+      onWheel={handleWheel}
       data-testid="scroll-tag-gutter"
     >
-      {/* Strip: right-click empty area to add a tag at the current position */}
+      {/* Strip: right-click a spot to tag that point in the conversation */}
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <div className="h-full w-full" />
+          <div className="h-full w-full" onContextMenu={handleStripContextMenu} />
         </ContextMenuTrigger>
         <ContextMenuContent>
           <ContextMenuItem onSelect={handleAddTag} className="gap-2">
@@ -83,20 +112,24 @@ export function ScrollTagGutter({
             <ContextMenuTrigger asChild>
               <button
                 className={cn(
-                  'absolute left-0 right-0 h-1.5 -translate-y-1/2 rounded-sm cursor-pointer transition-opacity',
-                  stale ? 'opacity-40 hover:opacity-60' : 'opacity-70 hover:opacity-100'
+                  'absolute left-0 right-0 h-1.5 -translate-y-1/2 rounded-sm transition-opacity',
+                  stale
+                    ? 'opacity-40 cursor-default'
+                    : 'opacity-70 hover:opacity-100 cursor-pointer'
                 )}
                 style={{
                   top: `${((fraction ?? tag.fractionHint) * 100).toFixed(2)}%`,
                   backgroundColor: tag.color
                 }}
-                onClick={() => jumpTo(tag)}
-                aria-label="Scroll tag"
+                onClick={() => {
+                  if (!stale) jumpTo(tag)
+                }}
+                aria-label={stale ? 'Scroll tag (unavailable)' : 'Scroll tag'}
                 data-testid="scroll-tag-marker"
               />
             </ContextMenuTrigger>
             <ContextMenuContent>
-              <ContextMenuItem onSelect={() => jumpTo(tag)} className="gap-2">
+              <ContextMenuItem onSelect={() => jumpTo(tag)} disabled={stale} className="gap-2">
                 <Bookmark className="h-3.5 w-3.5" />
                 Go to tag
               </ContextMenuItem>

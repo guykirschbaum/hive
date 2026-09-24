@@ -6,7 +6,7 @@ import { QueuedMessageBubble } from './QueuedMessageBubble'
 import type { OpenCodeMessage } from './SessionView'
 import { formatCompletionDuration } from '@/lib/format-utils'
 import beeIcon from '@/assets/bee.png'
-import { stabilizeAnchor, computeAnchorFraction } from './scroll-tag-anchors'
+import { stabilizeAnchor, computeAnchorFraction, anchorAtFraction } from '@/lib/scroll-tag-anchors'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -55,11 +55,12 @@ export interface VirtualizedMessageListHandle {
   scrollToEnd: (behavior?: ScrollBehavior) => void
   captureViewportAnchor: () => VirtualizedMessageListViewportAnchor | null
   /**
-   * Like captureViewportAnchor, but never anchors to ephemeral items
-   * (optimistic local messages, streaming/queued items, banners) — walks back
-   * to the nearest stable item instead. Used by scroll tags.
+   * Build an anchor for a fractional position (0..1) of the full content —
+   * used by scroll tags when the user clicks a spot on the gutter minimap.
+   * Never anchors to ephemeral items (optimistic local messages,
+   * streaming/queued items, banners) — walks back to the nearest stable item.
    */
-  captureStableViewportAnchor: () => VirtualizedMessageListViewportAnchor | null
+  captureAnchorAtFraction: (fraction: number) => VirtualizedMessageListViewportAnchor | null
   restoreViewportAnchor: (anchor: VirtualizedMessageListViewportAnchor) => boolean
   /** 0..1 fraction of the anchor within the full content, or null if unresolvable. */
   getAnchorFraction: (anchor: VirtualizedMessageListViewportAnchor) => number | null
@@ -223,8 +224,14 @@ export const VirtualizedMessageList = memo(
               }
             },
             captureViewportAnchor: captureAnchor,
-            captureStableViewportAnchor: () => {
-              const base = captureAnchor()
+            captureAnchorAtFraction: (fraction: number) => {
+              if (!scrollElement) return null
+              const base = anchorAtFraction(
+                fraction,
+                getMeasurements(),
+                virtualizer.getTotalSize(),
+                scrollElement.scrollHeight
+              )
               if (!base) return null
               return stabilizeAnchor(base, getMeasurements())
             },

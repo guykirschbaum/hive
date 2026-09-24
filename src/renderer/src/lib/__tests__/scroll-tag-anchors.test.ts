@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   isEphemeralItemKey,
   stabilizeAnchor,
-  computeAnchorFraction
+  computeAnchorFraction,
+  anchorAtFraction
 } from '../scroll-tag-anchors'
 
 const measurements = [
@@ -67,6 +68,45 @@ describe('stabilizeAnchor', () => {
       fallbackScrollHeight: 500
     }
     expect(stabilizeAnchor(anchor, allEphemeral)).toEqual(anchor)
+  })
+})
+
+describe('anchorAtFraction', () => {
+  // measurements: msg_1 @ 0, msg_2 @ 200, local @ 500, streaming @ 700; totalSize 1000
+  it('anchors to the item containing the fractional offset', () => {
+    const anchor = anchorAtFraction(0.3, measurements, 1000, 1040)
+    // offset 300 → last item with start <= 300 is msg_2 (start 200)
+    expect(anchor).toEqual({
+      itemKey: 'message:msg_2',
+      offsetWithinItem: 100,
+      fallbackScrollTop: 300,
+      fallbackScrollHeight: 1040
+    })
+  })
+
+  it('anchors to the first item at fraction 0', () => {
+    const anchor = anchorAtFraction(0, measurements, 1000, 1040)
+    expect(anchor?.itemKey).toBe('message:msg_1')
+    expect(anchor?.offsetWithinItem).toBe(0)
+  })
+
+  it('anchors to the last item at fraction 1', () => {
+    const anchor = anchorAtFraction(1, measurements, 1000, 1040)
+    expect(anchor?.itemKey).toBe('streaming:s1')
+    expect(anchor?.offsetWithinItem).toBe(300)
+  })
+
+  it('clamps out-of-range fractions', () => {
+    expect(anchorAtFraction(-0.5, measurements, 1000, 1040)?.fallbackScrollTop).toBe(0)
+    expect(anchorAtFraction(1.5, measurements, 1000, 1040)?.fallbackScrollTop).toBe(1000)
+  })
+
+  it('returns null with no measurements', () => {
+    expect(anchorAtFraction(0.5, [], 1000, 1040)).toBeNull()
+  })
+
+  it('returns null when total size is zero', () => {
+    expect(anchorAtFraction(0.5, measurements, 0, 1040)).toBeNull()
   })
 })
 

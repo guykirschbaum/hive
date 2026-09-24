@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   useScrollTagStore,
   MAX_TAGS_PER_SESSION,
+  MAX_SESSIONS,
   type ScrollTag
 } from './useScrollTagStore'
 
@@ -66,6 +67,21 @@ describe('useScrollTagStore', () => {
     expect(tags).toHaveLength(MAX_TAGS_PER_SESSION)
     expect(tags.find((t) => t.id === 't0')).toBeUndefined()
     expect(tags[tags.length - 1].id).toBe('newest')
+  })
+
+  it('drops the least-recently-touched session when exceeding the session cap', () => {
+    for (let i = 0; i < MAX_SESSIONS; i++) {
+      useScrollTagStore.getState().addTag(`session-${i}`, makeTag({ id: `t${i}` }))
+    }
+    // Touch session-0 so it becomes most-recent; session-1 is now oldest.
+    useScrollTagStore.getState().addTag('session-0', makeTag({ id: 'touch' }))
+    useScrollTagStore.getState().addTag('session-new', makeTag({ id: 'n' }))
+
+    const sessions = useScrollTagStore.getState().tagsBySession
+    expect(Object.keys(sessions)).toHaveLength(MAX_SESSIONS)
+    expect('session-1' in sessions).toBe(false)
+    expect('session-0' in sessions).toBe(true)
+    expect('session-new' in sessions).toBe(true)
   })
 
   it('persists only tagsBySession under the hive-scroll-tags key', () => {

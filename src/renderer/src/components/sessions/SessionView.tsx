@@ -6401,6 +6401,7 @@ function LegacySessionView({ sessionId }: SessionViewProps): React.JSX.Element {
           <ScrollTagGutter
             sessionId={sessionId}
             listRef={virtualizedListRef}
+            scrollElement={scrollElement}
             totalSize={listTotalSize}
           />
         )}

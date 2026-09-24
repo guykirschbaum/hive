@@ -52,6 +52,35 @@ export function stabilizeAnchor(
 }
 
 /**
+ * Build an anchor for a fractional position (0..1) within the full
+ * virtualized content — the inverse of computeAnchorFraction. Used when the
+ * user clicks a spot on the gutter minimap. Null when nothing is measured
+ * yet. Callers should run the result through stabilizeAnchor.
+ */
+export function anchorAtFraction(
+  fraction: number,
+  measurements: readonly ItemMeasurement[],
+  totalSize: number,
+  scrollHeight: number
+): ScrollAnchor | null {
+  if (totalSize <= 0 || measurements.length === 0) return null
+  const clamped = Math.min(1, Math.max(0, fraction))
+  const offset = clamped * totalSize
+  // Last measurement whose start is at or before the offset.
+  let target = measurements[0]
+  for (const m of measurements) {
+    if (m.start <= offset) target = m
+    else break
+  }
+  return {
+    itemKey: target.key,
+    offsetWithinItem: Math.max(0, offset - target.start),
+    fallbackScrollTop: offset,
+    fallbackScrollHeight: scrollHeight
+  }
+}
+
+/**
  * Fraction (0..1) of the anchored position within the full virtualized
  * content, for positioning gutter markers. Null when the anchored item no
  * longer exists or the total size is not yet measured.
