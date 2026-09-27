@@ -6402,6 +6402,7 @@ function LegacySessionView({ sessionId }: SessionViewProps): React.JSX.Element {
             sessionId={sessionId}
             listRef={virtualizedListRef}
             scrollElement={scrollElement}
+            onWheelIntent={handleScrollWheel}
             totalSize={listTotalSize}
           />
         )}

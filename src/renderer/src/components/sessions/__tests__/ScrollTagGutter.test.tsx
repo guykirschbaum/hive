@@ -17,23 +17,30 @@ const ANCHOR: VirtualizedMessageListViewportAnchor = {
 function makeHandle(
   overrides: Partial<VirtualizedMessageListHandle> = {}
 ): VirtualizedMessageListHandle {
-  return {
+  const handle: VirtualizedMessageListHandle = {
     scrollToEnd: vi.fn(),
     captureViewportAnchor: vi.fn(() => ANCHOR),
     captureAnchorAtFraction: vi.fn(() => ANCHOR),
     restoreViewportAnchor: vi.fn(() => true),
     getAnchorFraction: vi.fn(() => 0.25),
+    getAnchorFractions: vi.fn((anchors: readonly unknown[]) => anchors.map(() => 0.25)),
     ...overrides
   }
+  return handle
 }
 
-function renderGutter(handle: VirtualizedMessageListHandle, scrollElement?: HTMLDivElement) {
+function renderGutter(
+  handle: VirtualizedMessageListHandle,
+  scrollElement?: HTMLDivElement,
+  onWheelIntent?: () => void
+) {
   const listRef = { current: handle }
   return render(
     <ScrollTagGutter
       sessionId="session-test"
       listRef={listRef}
       scrollElement={scrollElement ?? null}
+      onWheelIntent={onWheelIntent}
       totalSize={1000}
     />
   )
@@ -77,6 +84,31 @@ describe('ScrollTagGutter', () => {
     expect(scrollElement.scrollBy).toHaveBeenCalledWith({ top: 42, left: 0 })
   })
 
+  it('signals manual-scroll intent before forwarding a wheel scroll', () => {
+    const scrollElement = document.createElement('div')
+    const calls: string[] = []
+    scrollElement.scrollBy = vi.fn(() => calls.push('scrollBy')) as never
+    const onWheelIntent = vi.fn(() => calls.push('intent'))
+    renderGutter(makeHandle(), scrollElement, onWheelIntent)
+
+    fireEvent.wheel(screen.getByTestId('scroll-tag-gutter'), { deltaY: -30 })
+
+    expect(onWheelIntent).toHaveBeenCalledTimes(1)
+    expect(calls).toEqual(['intent', 'scrollBy'])
+  })
+
+  it('adds no tag when no stable anchor is available', async () => {
+    const handle = makeHandle({ captureAnchorAtFraction: vi.fn(() => null) })
+    renderGutter(handle)
+
+    const strip = screen.getByTestId('scroll-tag-gutter').firstElementChild as HTMLElement
+    fireEvent.contextMenu(strip, { clientY: 50 })
+    fireEvent.click(await screen.findByText('Tag this spot'))
+
+    expect(screen.queryByTestId('scroll-tag-marker')).not.toBeInTheDocument()
+    expect(useScrollTagStore.getState().tagsBySession['session-test']).toBeUndefined()
+  })
+
   it('right-click → "Tag this spot" captures an anchor at the clicked fraction and adds a marker', async () => {
     const handle = makeHandle()
     renderGutter(handle)
@@ -104,7 +136,9 @@ describe('ScrollTagGutter', () => {
   })
 
   it('a stale marker (unresolvable anchor) does not jump on click', () => {
-    const handle = makeHandle({ getAnchorFraction: vi.fn(() => null) })
+    const handle = makeHandle({
+      getAnchorFractions: vi.fn((anchors: readonly unknown[]) => anchors.map(() => null))
+    })
     seedTag()
     renderGutter(handle)
 
@@ -114,7 +148,9 @@ describe('ScrollTagGutter', () => {
   })
 
   it('a stale marker has "Go to tag" disabled but "Delete tag" enabled', async () => {
-    const handle = makeHandle({ getAnchorFraction: vi.fn(() => null) })
+    const handle = makeHandle({
+      getAnchorFractions: vi.fn((anchors: readonly unknown[]) => anchors.map(() => null))
+    })
     seedTag()
     renderGutter(handle)
 

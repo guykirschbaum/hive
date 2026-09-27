@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { BookmarkPlus, Bookmark, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -19,6 +19,12 @@ interface ScrollTagGutterProps {
   listRef: React.RefObject<VirtualizedMessageListHandle | null>
   /** The message scroller; wheel events over the gutter are forwarded to it. */
   scrollElement: HTMLDivElement | null
+  /**
+   * Called before a forwarded wheel scroll, so the pane's manual-scroll
+   * tracking treats it like a wheel on the scroller itself (otherwise
+   * auto-scroll would snap back to bottom during streaming).
+   */
+  onWheelIntent?: () => void
   /** Rerender signal: markers reposition when the virtualized content size changes. */
   totalSize: number
 }
@@ -37,7 +43,8 @@ export function ScrollTagGutter({
   sessionId,
   listRef,
   scrollElement,
-  totalSize: _totalSize
+  onWheelIntent,
+  totalSize
 }: ScrollTagGutterProps): React.JSX.Element {
   const tags = useScrollTagStore((s) => s.tagsBySession[sessionId]) ?? EMPTY_TAGS
   const addTag = useScrollTagStore((s) => s.addTag)
@@ -62,9 +69,10 @@ export function ScrollTagGutter({
 
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
+      onWheelIntent?.()
       scrollElement?.scrollBy({ top: e.deltaY, left: e.deltaX })
     },
-    [scrollElement]
+    [scrollElement, onWheelIntent]
   )
 
   const handleAddTag = useCallback(() => {
@@ -90,6 +98,16 @@ export function ScrollTagGutter({
     [listRef, sessionId, touchSession]
   )
 
+  // One batch lookup per render (totalSize is the reposition signal) instead
+  // of a per-marker scan of the measurement list.
+  const fractions = useMemo(() => {
+    void totalSize
+    return (
+      listRef.current?.getAnchorFractions(tags.map((t) => t.anchor)) ??
+      tags.map(() => null as number | null)
+    )
+  }, [listRef, tags, totalSize])
+
   return (
     <div
       ref={containerRef}
@@ -111,8 +129,8 @@ export function ScrollTagGutter({
       </ContextMenu>
 
       {/* Markers overlay the strip (siblings of the strip trigger, not children) */}
-      {tags.map((tag) => {
-        const fraction = listRef.current?.getAnchorFraction(tag.anchor) ?? null
+      {tags.map((tag, i) => {
+        const fraction = fractions[i] ?? null
         const stale = fraction == null
         return (
           <ContextMenu key={tag.id}>

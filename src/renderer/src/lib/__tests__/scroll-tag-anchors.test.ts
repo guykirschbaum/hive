@@ -3,6 +3,7 @@ import {
   isEphemeralItemKey,
   stabilizeAnchor,
   computeAnchorFraction,
+  computeAnchorFractions,
   anchorAtFraction
 } from '../scroll-tag-anchors'
 
@@ -132,5 +133,34 @@ describe('computeAnchorFraction', () => {
 
   it('clamps to [0, 1]', () => {
     expect(computeAnchorFraction({ ...anchor, offsetWithinItem: 5000 }, measurements, 1000)).toBe(1)
+  })
+})
+
+describe('computeAnchorFractions', () => {
+  const anchorFor = (itemKey: string, offsetWithinItem = 0) => ({
+    itemKey,
+    offsetWithinItem,
+    fallbackScrollTop: 0,
+    fallbackScrollHeight: 1000
+  })
+
+  it('resolves a batch of anchors in one pass, matching single-anchor results', () => {
+    const anchors = [
+      anchorFor('message:msg_1', 50),
+      anchorFor('message:msg_2', 100),
+      anchorFor('message:gone'),
+      anchorFor('streaming:s1', 100)
+    ]
+    const batch = computeAnchorFractions(anchors, measurements, 1000)
+    expect(batch).toEqual(anchors.map((a) => computeAnchorFraction(a, measurements, 1000)))
+    expect(batch).toEqual([0.05, 0.3, null, 0.8])
+  })
+
+  it('returns all nulls when total size is zero', () => {
+    expect(computeAnchorFractions([anchorFor('message:msg_1')], measurements, 0)).toEqual([null])
+  })
+
+  it('returns an empty array for no anchors', () => {
+    expect(computeAnchorFractions([], measurements, 1000)).toEqual([])
   })
 })

@@ -95,3 +95,24 @@ export function computeAnchorFraction(
   if (!m) return null
   return Math.min(1, Math.max(0, (m.start + anchor.offsetWithinItem) / totalSize))
 }
+
+/**
+ * Batch variant of computeAnchorFraction: resolves many anchors with a single
+ * key→start map instead of scanning the measurement list per anchor. Used by
+ * the gutter to position all markers in one pass per render.
+ */
+export function computeAnchorFractions(
+  anchors: readonly ScrollAnchor[],
+  measurements: readonly ItemMeasurement[],
+  totalSize: number
+): (number | null)[] {
+  if (anchors.length === 0) return []
+  if (totalSize <= 0) return anchors.map(() => null)
+  const startByKey = new Map<string, number>()
+  for (const m of measurements) startByKey.set(m.key, m.start)
+  return anchors.map((anchor) => {
+    const start = startByKey.get(anchor.itemKey)
+    if (start === undefined) return null
+    return Math.min(1, Math.max(0, (start + anchor.offsetWithinItem) / totalSize))
+  })
+}

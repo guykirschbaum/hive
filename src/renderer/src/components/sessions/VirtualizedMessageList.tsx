@@ -6,7 +6,12 @@ import { QueuedMessageBubble } from './QueuedMessageBubble'
 import type { OpenCodeMessage } from './SessionView'
 import { formatCompletionDuration } from '@/lib/format-utils'
 import beeIcon from '@/assets/bee.png'
-import { stabilizeAnchor, computeAnchorFraction, anchorAtFraction } from '@/lib/scroll-tag-anchors'
+import {
+  stabilizeAnchor,
+  computeAnchorFractions,
+  anchorAtFraction,
+  isEphemeralItemKey
+} from '@/lib/scroll-tag-anchors'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -64,6 +69,10 @@ export interface VirtualizedMessageListHandle {
   restoreViewportAnchor: (anchor: VirtualizedMessageListViewportAnchor) => boolean
   /** 0..1 fraction of the anchor within the full content, or null if unresolvable. */
   getAnchorFraction: (anchor: VirtualizedMessageListViewportAnchor) => number | null
+  /** Batch variant: resolves all anchors with one key→offset map. */
+  getAnchorFractions: (
+    anchors: readonly VirtualizedMessageListViewportAnchor[]
+  ) => (number | null)[]
 }
 
 export interface VirtualizedMessageListViewportAnchor {
@@ -226,17 +235,32 @@ export const VirtualizedMessageList = memo(
             captureViewportAnchor: captureAnchor,
             captureAnchorAtFraction: (fraction: number) => {
               if (!scrollElement) return null
+              const measurements = getMeasurements()
               const base = anchorAtFraction(
                 fraction,
-                getMeasurements(),
+                measurements,
                 virtualizer.getTotalSize(),
                 scrollElement.scrollHeight
               )
               if (!base) return null
-              return stabilizeAnchor(base, getMeasurements())
+              const stabilized = stabilizeAnchor(base, measurements)
+              // No stable item to anchor to (e.g. only optimistic/streaming
+              // content exists yet) — refuse rather than saving a tag whose
+              // key is guaranteed to be replaced.
+              if (isEphemeralItemKey(stabilized.itemKey)) return null
+              return stabilized
             },
-            getAnchorFraction: (anchor: VirtualizedMessageListViewportAnchor) =>
-              computeAnchorFraction(anchor, getMeasurements(), virtualizer.getTotalSize()),
+            getAnchorFraction: (anchor: VirtualizedMessageListViewportAnchor) => {
+              const total = virtualizer.getTotalSize()
+              if (total <= 0) return null
+              const m = virtualizer.measurementsCache.find(
+                (mm) => String(mm.key) === anchor.itemKey
+              )
+              if (!m) return null
+              return Math.min(1, Math.max(0, (m.start + anchor.offsetWithinItem) / total))
+            },
+            getAnchorFractions: (anchors: readonly VirtualizedMessageListViewportAnchor[]) =>
+              computeAnchorFractions(anchors, getMeasurements(), virtualizer.getTotalSize()),
             restoreViewportAnchor: (anchor: VirtualizedMessageListViewportAnchor) => {
               if (!scrollElement) return false
 
