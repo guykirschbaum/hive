@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { BookmarkPlus, Bookmark, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -92,21 +92,25 @@ export function ScrollTagGutter({
 
   const jumpTo = useCallback(
     (tag: ScrollTag) => {
+      // Re-validate at click time: the transcript can change between renders
+      // (message replaced/removed) — never jump via the fallback path when
+      // the anchored item no longer exists.
+      if (listRef.current?.getAnchorFraction(tag.anchor) == null) return
       listRef.current?.restoreViewportAnchor(tag.anchor)
       touchSession(sessionId)
     },
     [listRef, sessionId, touchSession]
   )
 
-  // One batch lookup per render (totalSize is the reposition signal) instead
-  // of a per-marker scan of the measurement list.
-  const fractions = useMemo(() => {
-    void totalSize
-    return (
-      listRef.current?.getAnchorFractions(tags.map((t) => t.anchor)) ??
-      tags.map(() => null as number | null)
-    )
-  }, [listRef, tags, totalSize])
+  // One batch lookup per render (a single key→offset map) instead of a
+  // per-marker scan. Deliberately NOT memoized: message keys can change
+  // without totalSize changing, and any message change re-renders SessionView
+  // and therefore this component, keeping positions fresh. totalSize remains
+  // a prop purely as a re-render signal for size-only changes.
+  void totalSize
+  const fractions =
+    listRef.current?.getAnchorFractions(tags.map((t) => t.anchor)) ??
+    tags.map(() => null as number | null)
 
   return (
     <div

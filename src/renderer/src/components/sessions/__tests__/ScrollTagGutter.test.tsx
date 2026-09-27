@@ -135,6 +135,18 @@ describe('ScrollTagGutter', () => {
     expect(handle.restoreViewportAnchor).toHaveBeenCalledWith(tag.anchor)
   })
 
+  it('re-validates the anchor at click time even when the marker rendered as active', () => {
+    // Batch lookup said the marker is active, but the anchor has since become
+    // unresolvable (message replaced without a totalSize change).
+    const handle = makeHandle({ getAnchorFraction: vi.fn(() => null) })
+    seedTag()
+    renderGutter(handle)
+
+    fireEvent.click(screen.getByTestId('scroll-tag-marker'))
+
+    expect(handle.restoreViewportAnchor).not.toHaveBeenCalled()
+  })
+
   it('a stale marker (unresolvable anchor) does not jump on click', () => {
     const handle = makeHandle({
       getAnchorFractions: vi.fn((anchors: readonly unknown[]) => anchors.map(() => null))
