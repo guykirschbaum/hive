@@ -163,4 +163,15 @@ describe('computeAnchorFractions', () => {
   it('returns an empty array for no anchors', () => {
     expect(computeAnchorFractions([], measurements, 1000)).toEqual([])
   })
+
+  it('resolves measurements with non-string keys (raw virtualizer cache rows)', () => {
+    // The virtualizer's measurementsCache keys are typed string | number —
+    // callers may pass cache rows directly without copying/stringifying.
+    const rawMeasurements = [
+      { key: 42 as unknown as string, start: 0 },
+      { key: 'message:msg_2', start: 200 }
+    ]
+    const anchors = [anchorFor('42', 10), anchorFor('message:msg_2', 100)]
+    expect(computeAnchorFractions(anchors, rawMeasurements, 1000)).toEqual([0.01, 0.3])
+  })
 })

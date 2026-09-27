@@ -259,8 +259,15 @@ export const VirtualizedMessageList = memo(
               if (!m) return null
               return Math.min(1, Math.max(0, (m.start + anchor.offsetWithinItem) / total))
             },
-            getAnchorFractions: (anchors: readonly VirtualizedMessageListViewportAnchor[]) =>
-              computeAnchorFractions(anchors, getMeasurements(), virtualizer.getTotalSize()),
+            getAnchorFractions: (anchors: readonly VirtualizedMessageListViewportAnchor[]) => {
+              if (anchors.length === 0) return []
+              // Pass raw cache rows — no per-render copy of the measurement list.
+              return computeAnchorFractions(
+                anchors,
+                virtualizer.measurementsCache,
+                virtualizer.getTotalSize()
+              )
+            },
             restoreViewportAnchor: (anchor: VirtualizedMessageListViewportAnchor) => {
               if (!scrollElement) return false
 

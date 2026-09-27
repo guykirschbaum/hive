@@ -8,7 +8,8 @@ export interface ScrollAnchor {
 }
 
 export interface ItemMeasurement {
-  key: string
+  /** Matches @tanstack/virtual-core's Key so raw measurementsCache rows are accepted as-is. */
+  key: string | number | bigint
   start: number
 }
 
@@ -37,13 +38,14 @@ export function stabilizeAnchor(
 ): ScrollAnchor {
   if (!isEphemeralItemKey(anchor.itemKey)) return anchor
 
-  const idx = measurements.findIndex((m) => m.key === anchor.itemKey)
+  const idx = measurements.findIndex((m) => String(m.key) === anchor.itemKey)
   for (let i = idx - 1; i >= 0; i--) {
     const m = measurements[i]
-    if (!isEphemeralItemKey(m.key)) {
+    const key = String(m.key)
+    if (!isEphemeralItemKey(key)) {
       return {
         ...anchor,
-        itemKey: m.key,
+        itemKey: key,
         offsetWithinItem: Math.max(0, anchor.fallbackScrollTop - m.start)
       }
     }
@@ -73,7 +75,7 @@ export function anchorAtFraction(
     else break
   }
   return {
-    itemKey: target.key,
+    itemKey: String(target.key),
     offsetWithinItem: Math.max(0, offset - target.start),
     fallbackScrollTop: offset,
     fallbackScrollHeight: scrollHeight
@@ -91,7 +93,7 @@ export function computeAnchorFraction(
   totalSize: number
 ): number | null {
   if (totalSize <= 0) return null
-  const m = measurements.find((mm) => mm.key === anchor.itemKey)
+  const m = measurements.find((mm) => String(mm.key) === anchor.itemKey)
   if (!m) return null
   return Math.min(1, Math.max(0, (m.start + anchor.offsetWithinItem) / totalSize))
 }
@@ -108,8 +110,14 @@ export function computeAnchorFractions(
 ): (number | null)[] {
   if (anchors.length === 0) return []
   if (totalSize <= 0) return anchors.map(() => null)
+  // Single pass over measurements, storing only the keys the anchors need —
+  // allocations are bounded by the number of tags, not the conversation size.
+  const wantedKeys = new Set(anchors.map((a) => a.itemKey))
   const startByKey = new Map<string, number>()
-  for (const m of measurements) startByKey.set(m.key, m.start)
+  for (const m of measurements) {
+    const key = typeof m.key === 'string' ? m.key : String(m.key)
+    if (wantedKeys.has(key)) startByKey.set(key, m.start)
+  }
   return anchors.map((anchor) => {
     const start = startByKey.get(anchor.itemKey)
     if (start === undefined) return null

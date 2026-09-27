@@ -13,6 +13,7 @@ import { generateScrollTagColor } from '@/lib/scroll-tag-colors'
 import type { VirtualizedMessageListHandle } from './VirtualizedMessageList'
 
 const EMPTY_TAGS: ScrollTag[] = []
+const EMPTY_FRACTIONS: (number | null)[] = []
 
 interface ScrollTagGutterProps {
   sessionId: string
@@ -109,8 +110,10 @@ export function ScrollTagGutter({
   // a prop purely as a re-render signal for size-only changes.
   void totalSize
   const fractions =
-    listRef.current?.getAnchorFractions(tags.map((t) => t.anchor)) ??
-    tags.map(() => null as number | null)
+    tags.length === 0
+      ? EMPTY_FRACTIONS
+      : (listRef.current?.getAnchorFractions(tags.map((t) => t.anchor)) ??
+        tags.map(() => null as number | null))
 
   return (
     <div
