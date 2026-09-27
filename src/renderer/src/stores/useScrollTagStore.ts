@@ -27,6 +27,8 @@ interface ScrollTagState {
   tagsBySession: Record<string, ScrollTag[]>
   addTag: (sessionId: string, tag: ScrollTag) => void
   removeTag: (sessionId: string, tagId: string) => void
+  /** Mark a session as recently used so the LRU session cap doesn't evict it. No-op for unknown sessions. */
+  touchSession: (sessionId: string) => void
 }
 
 export const useScrollTagStore = create<ScrollTagState>()(
@@ -65,6 +67,19 @@ export const useScrollTagStore = create<ScrollTagState>()(
           } else {
             tagsBySession[sessionId] = next
           }
+          return { tagsBySession }
+        }),
+
+      touchSession: (sessionId) =>
+        set((state) => {
+          const existing = state.tagsBySession[sessionId]
+          if (!existing) return state
+          const keys = Object.keys(state.tagsBySession)
+          if (keys[keys.length - 1] === sessionId) return state
+          // Re-insert the key so insertion order marks it most-recent.
+          const tagsBySession = { ...state.tagsBySession }
+          delete tagsBySession[sessionId]
+          tagsBySession[sessionId] = existing
           return { tagsBySession }
         })
     }),

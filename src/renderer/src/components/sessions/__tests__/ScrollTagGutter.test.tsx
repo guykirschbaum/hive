@@ -62,6 +62,11 @@ describe('ScrollTagGutter', () => {
     expect(screen.getByTestId('scroll-tag-gutter').className).toContain('right-[12px]')
   })
 
+  it('stacks below the z-10 scroll-to-bottom FAB', () => {
+    renderGutter(makeHandle())
+    expect(screen.getByTestId('scroll-tag-gutter').className).toContain('z-[9]')
+  })
+
   it('forwards wheel events to the scroll element', () => {
     const scrollElement = document.createElement('div')
     scrollElement.scrollBy = vi.fn()
@@ -119,6 +124,29 @@ describe('ScrollTagGutter', () => {
     expect(goTo.closest('[role="menuitem"]')).toHaveAttribute('data-disabled')
     const del = screen.getByText('Delete tag')
     expect(del.closest('[role="menuitem"]')).not.toHaveAttribute('data-disabled')
+  })
+
+  it('viewing a session with tags refreshes its LRU recency', () => {
+    // session-test seeded first (older), then another session (newer).
+    seedTag()
+    useScrollTagStore.getState().addTag('session-other', {
+      id: 'other-tag',
+      color: '#3b82f6',
+      anchor: ANCHOR,
+      fractionHint: 0.5,
+      createdAt: 2
+    })
+    expect(Object.keys(useScrollTagStore.getState().tagsBySession)).toEqual([
+      'session-test',
+      'session-other'
+    ])
+
+    renderGutter(makeHandle())
+
+    expect(Object.keys(useScrollTagStore.getState().tagsBySession)).toEqual([
+      'session-other',
+      'session-test'
+    ])
   })
 
   it('deletes a tag via the marker context menu', async () => {

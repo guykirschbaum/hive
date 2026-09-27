@@ -84,6 +84,36 @@ describe('useScrollTagStore', () => {
     expect('session-new' in sessions).toBe(true)
   })
 
+  it('touchSession moves an existing session to most-recent', () => {
+    useScrollTagStore.getState().addTag('session-a', makeTag({ id: 'a' }))
+    useScrollTagStore.getState().addTag('session-b', makeTag({ id: 'b' }))
+    useScrollTagStore.getState().touchSession('session-a')
+    expect(Object.keys(useScrollTagStore.getState().tagsBySession)).toEqual([
+      'session-b',
+      'session-a'
+    ])
+  })
+
+  it('a touched session survives eviction over an untouched one', () => {
+    for (let i = 0; i < MAX_SESSIONS; i++) {
+      useScrollTagStore.getState().addTag(`session-${i}`, makeTag({ id: `t${i}` }))
+    }
+    // session-0 is oldest; touching it should make session-1 the eviction candidate.
+    useScrollTagStore.getState().touchSession('session-0')
+    useScrollTagStore.getState().addTag('session-new', makeTag({ id: 'n' }))
+
+    const sessions = useScrollTagStore.getState().tagsBySession
+    expect('session-0' in sessions).toBe(true)
+    expect('session-1' in sessions).toBe(false)
+  })
+
+  it('touchSession is a no-op for an unknown session', () => {
+    useScrollTagStore.getState().addTag('session-a', makeTag({ id: 'a' }))
+    const before = useScrollTagStore.getState().tagsBySession
+    useScrollTagStore.getState().touchSession('session-missing')
+    expect(useScrollTagStore.getState().tagsBySession).toBe(before)
+  })
+
   it('persists only tagsBySession under the hive-scroll-tags key', () => {
     useScrollTagStore.getState().addTag('session-a', makeTag({ id: 'a' }))
     const raw = localStorage.getItem('hive-scroll-tags')

@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { BookmarkPlus, Bookmark, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -42,6 +42,12 @@ export function ScrollTagGutter({
   const tags = useScrollTagStore((s) => s.tagsBySession[sessionId]) ?? EMPTY_TAGS
   const addTag = useScrollTagStore((s) => s.addTag)
   const removeTag = useScrollTagStore((s) => s.removeTag)
+  const touchSession = useScrollTagStore((s) => s.touchSession)
+
+  // Viewing a session with tags counts as "using" it for the LRU session cap.
+  useEffect(() => {
+    touchSession(sessionId)
+  }, [sessionId, touchSession])
 
   const containerRef = useRef<HTMLDivElement>(null)
   // Fraction of the gutter height where the user right-clicked, captured
@@ -79,14 +85,15 @@ export function ScrollTagGutter({
   const jumpTo = useCallback(
     (tag: ScrollTag) => {
       listRef.current?.restoreViewportAnchor(tag.anchor)
+      touchSession(sessionId)
     },
-    [listRef]
+    [listRef, sessionId, touchSession]
   )
 
   return (
     <div
       ref={containerRef}
-      className="absolute top-0 bottom-0 right-[12px] w-2.5 z-10"
+      className="absolute top-0 bottom-0 right-[12px] w-2.5 z-[9]"
       onWheel={handleWheel}
       data-testid="scroll-tag-gutter"
     >
